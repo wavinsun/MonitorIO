@@ -1,0 +1,24 @@
+apply plugin: 'maven'
+
+import org.gradle.api.internal.artifacts.publish.DefaultPublishArtifact
+
+artifacts{
+    archives new DefaultPublishArtifact("monitor-io", "jar", "jar", null, new Date(),
+            new File("build/intermediates/bundles/release/classes.jar"))
+}
+
+uploadArchives {
+    repositories.mavenDeployer {
+        name = 'mavenCentralReleaseDeployer'
+        repository(url: "http://127.0.0.1:8081/nexus/content/repositories/wavinsun") {
+            authentication(userName: "wavinsun", password: "wavinsun")
+        }
+        addFilter("monitor-io") {artifact, file ->
+            artifact.name == "monitor-io"
+        }
+        pom("monitor-io").packaging = 'jar'
+        pom("monitor-io").groupId = "cn.mutils.app"
+        pom("monitor-io").artifactId = "monitor-io"
+        pom("monitor-io").version = "1.0.0"
+    }
+}
