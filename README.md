@@ -116,6 +116,12 @@ cn.mutils.app.io.monitor.AccessError: Access Denied -> [MK_DIR] /storage/emulate
 * [OPEN_W] /storage/emulated/0/demo/
 ***************************************************************************************
 </code></pre>
+
+如果不采用错误崩溃方式处理AccessError，可以配置显示Alert提示框，点击任意地方即可影藏Alert并且拷贝信息到系统剪切板
+<pre><code>
+DemoMonitor monitor = new DemoMonitor(this);
+monitor.setMethod(SDMonitor.METHOD_SHOW_ALERT);
+</code></pre>
 ## 技术原理 ##
 通过反射拿出系统打开io流的对象，进行hook监控。  
 Android FileOutStream：

@@ -42,6 +42,6 @@ public class AccessError extends Error {
         if (mPath == null) {
             return name + ":\n" + msg;
         }
-        return name + ": Access Denied -> [" + mMode + "] " + mPath + "\n" + msg;
+        return name + ": Access Denied -> [" + mMode + "] " + mPath + (msg != null ? ("\n" + msg) : "");
     }
 }

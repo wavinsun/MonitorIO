@@ -2,6 +2,8 @@ package cn.mutils.app.io.monitor;
 
 import android.content.Context;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import cn.mutils.app.io.monitor.annotation.AccessManifest;
@@ -10,6 +12,8 @@ import cn.mutils.app.io.monitor.annotation.AccessModeComparator;
 import cn.mutils.app.io.monitor.annotation.AccessPath;
 
 import java.io.File;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +25,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Created by wenhua.ywh on 2016/11/29.
  */
 public class SDMonitor implements IOInterceptor {
+
+    public static final int METHOD_THROW_ERROR = 0;
+    public static final int METHOD_SHOW_ALERT = 1;
 
     public static final int MODE_DEFAULT = 0x00000000;
     public static final int MODE_MAKE_DIR = 0x00000001;
@@ -41,9 +48,13 @@ public class SDMonitor implements IOInterceptor {
 
     private Map<AccessMode, List<String>> mAccessMap = new ConcurrentHashMap<AccessMode, List<String>>();
 
+    private int mMethod = METHOD_THROW_ERROR;
+    private AppAlert mAppAlert;
+
     public SDMonitor(Context context) {
         mContext = context;
         initAccessManifest();
+        mAppAlert = new AppAlert(mContext);
     }
 
     private void initAccessManifest() {
@@ -84,6 +95,10 @@ public class SDMonitor implements IOInterceptor {
             }
         }
         mEnabled = !mAccessMap.isEmpty();
+    }
+
+    public void setMethod(int method) {
+        mMethod = method;
     }
 
     public void add(String path) {
@@ -219,7 +234,22 @@ public class SDMonitor implements IOInterceptor {
             }
         }
         if (!authorized) {
-            throw new AccessError(path, mode, printAccessMap());
+            if (mMethod == METHOD_THROW_ERROR) {
+                throw new AccessError(path, mode, printAccessMap());
+            } else {
+                if (!mAppAlert.isShow()) {
+                    final String eStr = printStackTrace(new AccessError(path, mode, null));
+                    mAppAlert.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            mAppAlert.setClipboardText(eStr);
+                            mAppAlert.setText(eStr);
+                            mAppAlert.show();
+                        }
+                    });
+                }
+            }
+            return;
         }
         Log.d(TAG, "Authorize: [" + mode + "] " + path + "");
     }
@@ -275,5 +305,14 @@ public class SDMonitor implements IOInterceptor {
             sb.append("*");
         }
         return sb.toString();
+    }
+
+    public static String printStackTrace(Throwable e) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        e.printStackTrace(pw);
+        pw.flush();
+        pw.close();
+        return sw.toString();
     }
 }

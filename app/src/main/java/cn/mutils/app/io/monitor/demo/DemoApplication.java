@@ -11,8 +11,8 @@ public class DemoApplication extends Application {
     public void onCreate() {
         super.onCreate();
         if (BuildConfig.DEBUG) {
-            DemoMonitor guard = new DemoMonitor(this);
-            guard.install();
+            DemoMonitor monitor = new DemoMonitor(this);
+            monitor.install();
         }
     }
 }

@@ -14,6 +14,7 @@ public class DemoMonitor extends SDMonitor {
 
     public DemoMonitor(Context context) {
         super(context);
+        this.setMethod(SDMonitor.METHOD_SHOW_ALERT);
         this.add("test");
     }
 
