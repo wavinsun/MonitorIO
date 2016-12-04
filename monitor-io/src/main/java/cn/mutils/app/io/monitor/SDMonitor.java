@@ -2,14 +2,7 @@ package cn.mutils.app.io.monitor;
 
 import android.content.Context;
 import android.os.Environment;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
-
-import cn.mutils.app.io.monitor.annotation.AccessManifest;
-import cn.mutils.app.io.monitor.annotation.AccessMode;
-import cn.mutils.app.io.monitor.annotation.AccessModeComparator;
-import cn.mutils.app.io.monitor.annotation.AccessPath;
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -20,6 +13,11 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import cn.mutils.app.io.monitor.annotation.AccessManifest;
+import cn.mutils.app.io.monitor.annotation.AccessMode;
+import cn.mutils.app.io.monitor.annotation.AccessModeComparator;
+import cn.mutils.app.io.monitor.annotation.AccessPath;
 
 /**
  * Created by wenhua.ywh on 2016/11/29.
