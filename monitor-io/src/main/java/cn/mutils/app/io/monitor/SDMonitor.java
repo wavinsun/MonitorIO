@@ -2,6 +2,8 @@ package cn.mutils.app.io.monitor;
 
 import android.content.Context;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
 
 import java.io.File;
@@ -48,11 +50,25 @@ public class SDMonitor implements IOInterceptor {
 
     private int mMethod = METHOD_THROW_ERROR;
     private AppAlert mAppAlert;
+    private long mAlertGapTime = 5000;
+    private HandlerThread mHandlerThread;
+    private Handler mHandler;
 
     public SDMonitor(Context context) {
         mContext = context;
         initAccessManifest();
         mAppAlert = new AppAlert(mContext);
+        mHandlerThread = new HandlerThread(TAG);
+        mHandlerThread.start();
+        mHandler = new Handler(mHandlerThread.getLooper());
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        if (mHandlerThread != null) {
+            mHandlerThread.getLooper().quit();
+        }
+        super.finalize();
     }
 
     private void initAccessManifest() {
@@ -93,6 +109,10 @@ public class SDMonitor implements IOInterceptor {
             }
         }
         mEnabled = !mAccessMap.isEmpty();
+    }
+
+    public void setAlertGapTime(long gapTime) {
+        mAlertGapTime = gapTime;
     }
 
     public void setMethod(int method) {
@@ -161,36 +181,63 @@ public class SDMonitor implements IOInterceptor {
     }
 
     @Override
-    public void onMkDir(String path, int mode) {
-        Log.d(TAG, "MkDir: [" + mode + "] " + path);
-        authorize(path, AccessMode.MK_DIR);
+    public void onMkDir(final String path, final int mode) {
+        final AccessError e = new AccessError(path, AccessMode.MK_DIR, null);
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "MkDir: [" + mode + "] " + path);
+                authorize(path, AccessMode.MK_DIR, e);
+            }
+        });
     }
 
     @Override
-    public void onRemove(String path) {
-        Log.d(TAG, "Remove: " + path);
-        authorize(path, AccessMode.REMOVE);
+    public void onRemove(final String path) {
+        final AccessError e = new AccessError(path, AccessMode.REMOVE, null);
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "Remove: " + path);
+                authorize(path, AccessMode.REMOVE, e);
+            }
+        });
     }
 
     @Override
-    public void onRename(String oldPath, String newPath) {
-        Log.d(TAG, "Rename: " + oldPath + " -> " + newPath);
-        authorize(oldPath, AccessMode.RENAME);
-        authorize(newPath, AccessMode.RENAME);
+    public void onRename(final String oldPath, final String newPath) {
+        final AccessError eOld = new AccessError(oldPath, AccessMode.RENAME, null);
+        final AccessError eNew = new AccessError(newPath, AccessMode.RENAME, null);
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "Rename: " + oldPath + " -> " + newPath);
+                authorize(oldPath, AccessMode.RENAME, eOld);
+                authorize(newPath, AccessMode.RENAME, eNew);
+            }
+        });
     }
 
     @Override
-    public void onOpen(String path, int flags, int mode) {
-        Log.d(TAG, "Open: " + "[" + flags + "][" + mode + "] " + path);
-        if (mode == IO_MODE_READ) {
-            authorize(path, AccessMode.OPEN_R);
-        }
-        if (mode == IO_MODE_WRITE) {
-            authorize(path, AccessMode.OPEN_W);
-        }
+    public void onOpen(final String path, final int flags, final int mode) {
+        final AccessError e = new AccessError(path, null, null);
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "Open: " + "[" + flags + "][" + mode + "] " + path);
+                if (mode == IO_MODE_READ) {
+                    e.setMode(AccessMode.OPEN_R);
+                    authorize(path, AccessMode.OPEN_R, e);
+                }
+                if (mode == IO_MODE_WRITE) {
+                    e.setMode(AccessMode.OPEN_W);
+                    authorize(path, AccessMode.OPEN_W, e);
+                }
+            }
+        });
     }
 
-    private void authorize(String path, AccessMode mode) {
+    private void authorize(String path, AccessMode mode, AccessError e) {
         if (!mEnabled) {
             return;
         }
@@ -233,10 +280,11 @@ public class SDMonitor implements IOInterceptor {
         }
         if (!authorized) {
             if (mMethod == METHOD_THROW_ERROR) {
-                throw new AccessError(path, mode, printAccessMap());
+                e.setMessage(printAccessMap());
+                throw e;
             } else {
-                if (!mAppAlert.isShow()) {
-                    final String eStr = printStackTrace(new AccessError(path, mode, null));
+                if (!mAppAlert.isShow() && (System.currentTimeMillis() - mAppAlert.getManualCloseTime()) > mAlertGapTime) {
+                    final String eStr = printStackTrace(e);
                     mAppAlert.post(new Runnable() {
                         @Override
                         public void run() {

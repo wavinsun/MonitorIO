@@ -58,6 +58,8 @@ public class AppAlert implements View.OnClickListener {
         }
     };
 
+    private volatile long mManualCloseTime;
+
     public AppAlert(Context context) {
         this.mContext = context;
         initView();
@@ -65,6 +67,10 @@ public class AppAlert implements View.OnClickListener {
         mToast.setView(mView);
         mToast.setGravity(Gravity.LEFT | Gravity.BOTTOM, 0, 0);
         initTN();
+    }
+
+    public long getManualCloseTime() {
+        return mManualCloseTime;
     }
 
     private void initView() {
@@ -177,6 +183,7 @@ public class AppAlert implements View.OnClickListener {
     public void onClick(View v) {
         hide();
         copyToClipboard();
+        mManualCloseTime = System.currentTimeMillis();
     }
 
     public boolean isAppInBackground() {
