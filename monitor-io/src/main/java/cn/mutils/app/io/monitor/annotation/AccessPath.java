@@ -16,4 +16,6 @@ public @interface AccessPath {
 
     AccessMode[] mode() default {};
 
+    boolean isFile() default false;
+
 }

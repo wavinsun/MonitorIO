@@ -53,6 +53,7 @@ public class SDMonitor implements IOInterceptor {
     private long mAlertGapTime = 5000;
     private HandlerThread mHandlerThread;
     private Handler mHandler;
+    private boolean mLogEnabled;
 
     public SDMonitor(Context context) {
         mContext = context;
@@ -66,9 +67,13 @@ public class SDMonitor implements IOInterceptor {
     @Override
     protected void finalize() throws Throwable {
         if (mHandlerThread != null) {
-            mHandlerThread.getLooper().quit();
+            mHandlerThread.quit();
         }
         super.finalize();
+    }
+
+    public void setLogEnabled(boolean enabled) {
+        mLogEnabled = enabled;
     }
 
     private void initAccessManifest() {
@@ -81,12 +86,14 @@ public class SDMonitor implements IOInterceptor {
             if (path.isEmpty()) {
                 continue;
             }
-            if (!path.endsWith("/")) {
-                path = path + "/";
+            if (!accessPath.isFile()) {
+                if (!path.endsWith("/")) {
+                    path = path + "/";
+                }
             }
             AccessMode[] modes = accessPath.mode();
             if (modes.length == 0) {
-                modes = AccessMode.defaultModes();
+                modes = accessPath.isFile() ? AccessMode.defaultFileModes() : AccessMode.defaultModes();
             } else {
                 //将OPEN转变为OPEN_R和OPEN_W拷贝到数组
                 int openIndex = Arrays.binarySearch(modes, AccessMode.OPEN);
@@ -124,6 +131,9 @@ public class SDMonitor implements IOInterceptor {
     }
 
     public void add(String path, int modes) {
+        if (!path.endsWith("/")) {
+            path = path + "/";
+        }
         if (modes == MODE_DEFAULT) {
             modes = (MODE_MAKE_DIR | MODE_REMOVE | MODE_RENAME | MODE_READ | MODE_WRITE);
         }
@@ -148,9 +158,6 @@ public class SDMonitor implements IOInterceptor {
         if (path == null || path.isEmpty()) {
             return;
         }
-        if (!path.endsWith("/")) {
-            path = path + "/";
-        }
         List<String> paths = null;
         if (!mAccessMap.containsKey(accessMode)) {
             paths = new CopyOnWriteArrayList<String>();
@@ -162,6 +169,28 @@ public class SDMonitor implements IOInterceptor {
             }
         }
         paths.add(path);
+    }
+
+    public void addFile(String path) {
+        addFile(path, MODE_DEFAULT);
+    }
+
+    public void addFile(String path, int modes) {
+        if (modes == MODE_DEFAULT) {
+            modes = (MODE_REMOVE | MODE_RENAME | MODE_READ | MODE_WRITE);
+        }
+        if ((modes & MODE_REMOVE) == MODE_REMOVE) {
+            add(path, AccessMode.REMOVE);
+        }
+        if ((modes & MODE_RENAME) == MODE_RENAME) {
+            add(path, AccessMode.RENAME);
+        }
+        if ((modes & MODE_READ) == MODE_READ) {
+            add(path, AccessMode.OPEN_R);
+        }
+        if ((modes & MODE_WRITE) == MODE_WRITE) {
+            add(path, AccessMode.OPEN_W);
+        }
     }
 
     public void setEnabled(boolean enabled) {
@@ -186,7 +215,9 @@ public class SDMonitor implements IOInterceptor {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "MkDir: [" + mode + "] " + path);
+                if (mLogEnabled) {
+                    Log.d(TAG, "MkDir: [" + mode + "] " + path);
+                }
                 authorize(path, AccessMode.MK_DIR, e);
             }
         });
@@ -198,7 +229,9 @@ public class SDMonitor implements IOInterceptor {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "Remove: " + path);
+                if (mLogEnabled) {
+                    Log.d(TAG, "Remove: " + path);
+                }
                 authorize(path, AccessMode.REMOVE, e);
             }
         });
@@ -211,7 +244,9 @@ public class SDMonitor implements IOInterceptor {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "Rename: " + oldPath + " -> " + newPath);
+                if (mLogEnabled) {
+                    Log.d(TAG, "Rename: " + oldPath + " -> " + newPath);
+                }
                 authorize(oldPath, AccessMode.RENAME, eOld);
                 authorize(newPath, AccessMode.RENAME, eNew);
             }
@@ -224,7 +259,9 @@ public class SDMonitor implements IOInterceptor {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "Open: " + "[" + flags + "][" + mode + "] " + path);
+                if (mLogEnabled) {
+                    Log.d(TAG, "Open: " + "[" + flags + "][" + mode + "] " + path);
+                }
                 if (mode == IO_MODE_READ) {
                     e.setMode(AccessMode.OPEN_R);
                     authorize(path, AccessMode.OPEN_R, e);
@@ -258,23 +295,34 @@ public class SDMonitor implements IOInterceptor {
         }
         boolean authorized = false;
         for (String accessPath : paths) {
-            String accessDir = sdRoot + accessPath;
+            String accessAbsolutePath = sdRoot + accessPath;
+            boolean isFileMode = accessAbsolutePath.charAt(accessAbsolutePath.length() - 1) != '/';
             if (mode == AccessMode.MK_DIR) {
-                if (accessDir.length() == path.length() + 1) {
-                    if (accessDir.startsWith(path)) {
+                if (isFileMode) {
+                    continue;
+                }
+                if (accessAbsolutePath.length() == path.length() + 1) {
+                    if (accessAbsolutePath.startsWith(path)) {
                         authorized = true;
                         break;
                     }
                 } else {
-                    if (path.length() > accessDir.length() && path.startsWith(accessDir)) {
+                    if (path.length() > accessAbsolutePath.length() && path.startsWith(accessAbsolutePath)) {
                         authorized = true;
                         break;
                     }
                 }
             } else {
-                if (path.length() > accessDir.length() && path.startsWith(accessDir)) {
-                    authorized = true;
-                    break;
+                if (isFileMode) {
+                    if (path.equals(accessAbsolutePath)) {
+                        authorized = true;
+                        break;
+                    }
+                } else {
+                    if (path.length() > accessAbsolutePath.length() && path.startsWith(accessAbsolutePath)) {
+                        authorized = true;
+                        break;
+                    }
                 }
             }
         }
@@ -297,7 +345,9 @@ public class SDMonitor implements IOInterceptor {
             }
             return;
         }
-        Log.d(TAG, "Authorize: [" + mode + "] " + path + "");
+        if (mLogEnabled) {
+            Log.d(TAG, "Authorize: [" + mode + "] " + path + "");
+        }
     }
 
     /**

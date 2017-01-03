@@ -53,13 +53,13 @@ public class SDMonitorActivity extends AppCompatActivity implements View.OnClick
             break;
             case R.id.open_r: {
                 try {
-                    FileInputStream fis = new FileInputStream(Environment.getExternalStorageDirectory() + "/demo");
+                    FileInputStream fis = new FileInputStream(Environment.getExternalStorageDirectory() + "/demo/0");
                     fis.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
                 try {
-                    FileInputStream fis = new FileInputStream(Environment.getExternalStorageDirectory() + "/demo0");
+                    FileInputStream fis = new FileInputStream(Environment.getExternalStorageDirectory() + "/test.log");
                     fis.close();
                 } catch (Exception e) {
                     e.printStackTrace();

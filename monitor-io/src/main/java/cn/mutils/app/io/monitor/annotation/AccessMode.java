@@ -41,4 +41,8 @@ public enum AccessMode {
         return new AccessMode[]{MK_DIR, REMOVE, RENAME, OPEN_R, OPEN_W};
     }
 
+    public static AccessMode[] defaultFileModes() {
+        return new AccessMode[]{REMOVE, RENAME, OPEN_R, OPEN_W};
+    }
+
 }

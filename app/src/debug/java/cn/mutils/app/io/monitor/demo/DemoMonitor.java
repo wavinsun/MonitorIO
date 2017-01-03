@@ -16,6 +16,7 @@ public class DemoMonitor extends SDMonitor {
         super(context);
         this.setMethod(SDMonitor.METHOD_SHOW_ALERT);
         this.add("test");
+        this.addFile("test.log");
     }
 
 }
